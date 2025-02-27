@@ -53,11 +53,19 @@ const createElement = (tag, props = {}) => {
   });
   return element;
 };
-function Header() {
-  const header = createElement("header");
-  const title = createElement("h1", { textContent: "🎱행운의 로또" });
-  header.appendChild(title);
-  return header;
+function PurchaseForm(playLotto) {
+  const purchasePriceHeader = createElement("span", {
+    class: "header",
+    textContent: "구매 금액을 입력해주세요."
+  });
+  playLotto.appendChild(purchasePriceHeader);
+  const inputContainer = createElement("div", { class: "input-container" });
+  const priceInput = createElement("input", { type: "text", placeholder: "금액" });
+  const purchaseButton = createElement("button", { textContent: "구매" });
+  inputContainer.appendChild(priceInput);
+  inputContainer.appendChild(purchaseButton);
+  playLotto.appendChild(inputContainer);
+  return { priceInput, purchaseButton };
 }
 const LOTTO = Object.freeze({
   MIN_PURCHASE_PRICE: 1e3,
@@ -76,6 +84,9 @@ const LOTTO = Object.freeze({
   PRIZE_OF_FOUR_MATCH: 5e4,
   PRIZE_OF_THREE_MATCH: 5e3
 });
+const getArrayOfStringsFromArrayOfArrays = (arrays) => {
+  return arrays.map((arr) => `${arr.join(", ")}`);
+};
 const getRandomNumber = () => {
   return Math.floor(Math.random() * LOTTO.MAX_RANDOM_NUMBER) + LOTTO.MIN_RANDOM_NUMBER;
 };
@@ -94,9 +105,6 @@ const getUnduplicatedRandomLottos = () => {
     Array.from({ length: LOTTO.MAX_LENGTH }, () => randomNumberSet.add(getRandomNumber()));
   }
   return [...randomNumberSet].sort((a, b) => a - b);
-};
-const getArrayOfStrings = (arrays) => {
-  return arrays.map((arr) => `${arr.join(", ")}`);
 };
 function randomLottos(playLotto, randomLottosArray) {
   const purchasedLottoQuantity = createElement("span", {
@@ -131,13 +139,13 @@ function WinningNumberInputs(winningNumberContainer) {
   const winningNumbersArray = new Array(6).fill(0);
   const bonusNumber = { value: 0 };
   const winningInputs = createElement("div", { class: "winning-inputs" });
-  CreateSixWinningInputs(winningAndBonusInputContainer, winningInputs, winningNumbersArray);
+  CreateSixWinningInputs({ winningAndBonusInputContainer, winningInputs, winningNumbersArray });
   CreateBonusInput(winningAndBonusInputContainer, bonusNumber);
   winningNumberContainer.appendChild(winningAndBonusInputContainer);
   return { winningNumbersArray, bonusNumber };
 }
-function CreateSixWinningInputs(winningAndBonusInputContainer, winningInputs, winningNumbersArray) {
-  Array.from({ length: 6 }, (_, idx) => {
+function CreateSixWinningInputs({ winningAndBonusInputContainer, winningInputs, winningNumbersArray }) {
+  Array.from({ length: LOTTO.MAX_LENGTH }, (_, idx) => {
     const winningNumberInput = createElement("input", { type: "text", class: "winning-input" });
     winningNumberInput.addEventListener("input", (e) => {
       winningNumbersArray[idx] = Number(e.target.value);
@@ -154,25 +162,11 @@ function CreateBonusInput(winningAndBonusInputContainer, bonusNumber) {
   winningAndBonusInputContainer.appendChild(bonusNumberInput);
 }
 function WinningNumbers(playLotto) {
-  const winningNumberContainer = document.createElement("div", { class: "winning-number-container" });
+  const winningNumberContainer = createElement("div", { class: "winning-number-container" });
   WinningNumberHeaders(winningNumberContainer);
   const { winningNumbersArray, bonusNumber } = WinningNumberInputs(winningNumberContainer);
   playLotto.appendChild(winningNumberContainer);
   return { winningNumbersArray, bonusNumber };
-}
-function PurchaseForm(playLotto) {
-  const purchasePriceHeader = createElement("span", {
-    class: "header",
-    textContent: "구매 금액을 입력해주세요."
-  });
-  playLotto.appendChild(purchasePriceHeader);
-  const inputContainer = createElement("div", { class: "input-container" });
-  const priceInput = createElement("input", { type: "text", placeholder: "금액" });
-  const purchaseButton = createElement("button", { textContent: "구매" });
-  inputContainer.appendChild(priceInput);
-  inputContainer.appendChild(purchaseButton);
-  playLotto.appendChild(inputContainer);
-  return { priceInput, purchaseButton };
 }
 const ERROR = Object.freeze({
   EMPTY_VALUE: "입력 값은 빈 값이 아니여야 해요.",
@@ -249,7 +243,7 @@ const plusIfWinningNumbers = (lottoNumbers, randomLotto) => {
 };
 const calculateRevenue = (matchCounts, purchasePrice) => {
   const sumOfLottoPrize = matchCounts.reduce(
-    (acc, cur, idx) => idx >= 3 ? acc + cur * calculateRevenueByMatch(idx) : acc,
+    (acc, cur, idx) => idx >= LOTTO.THREE_MATCH ? acc + cur * calculateRevenueByMatch(idx) : acc,
     0
   );
   return Number((sumOfLottoPrize / purchasePrice * 100).toFixed(1));
@@ -363,30 +357,40 @@ function validateWinningAndBonusNumbers(winningNumbers, bonusNumber) {
   validateWinningNumbers(winningNumbers.join(","));
   validateBonusNumber(bonusNumber.value, winningNumbers);
 }
+function PlayLottoWithPurchasePrice(playLotto, priceInput) {
+  try {
+    const lottoQuantity = priceInput.value / LOTTO.MIN_PURCHASE_PRICE;
+    const randomlottos = getRandomLottos(lottoQuantity);
+    randomLottos(playLotto, getArrayOfStringsFromArrayOfArrays(randomlottos));
+    const winningNumberInputHeader = createElement("span", {
+      class: "header",
+      textContent: "지난 주 당첨번호 6개와 보너스 번호 1개를 입력해주세요."
+    });
+    playLotto.appendChild(winningNumberInputHeader);
+    const { winningNumbersArray, bonusNumber } = WinningNumbers(playLotto);
+    const resultButton = LottoResultModal(
+      { priceInput, playLotto, randomlottos },
+      {
+        winningNumbers: winningNumbersArray,
+        bonusNumber
+      }
+    );
+    playLotto.appendChild(resultButton);
+  } catch (error) {
+    alert(error.message);
+  }
+}
 function PlayLotto() {
   const playLotto = createElement("div", { class: "play-lotto" });
   const { priceInput, purchaseButton } = PurchaseForm(playLotto);
   purchaseButton.addEventListener("click", () => {
-    try {
-      const lottoQuantity = priceInput.value / LOTTO.MIN_PURCHASE_PRICE;
-      const randomlottos = getRandomLottos(lottoQuantity);
-      randomLottos(playLotto, getArrayOfStrings(randomlottos));
-      const winningNumberInputHeader = createElement("span", {
-        class: "header",
-        textContent: "지난 주 당첨번호 6개와 보너스 번호 1개를 입력해주세요."
-      });
-      playLotto.appendChild(winningNumberInputHeader);
-      const { winningNumbersArray, bonusNumber } = WinningNumbers(playLotto);
-      const resultButton = LottoResultModal(
-        { priceInput, playLotto, randomlottos },
-        {
-          winningNumbers: winningNumbersArray,
-          bonusNumber
-        }
-      );
-      playLotto.appendChild(resultButton);
-    } catch (error) {
-      alert(error.message);
+    PlayLottoWithPurchasePrice(playLotto, priceInput);
+    priceInput.disabled = true;
+  });
+  priceInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      PlayLottoWithPurchasePrice(playLotto, priceInput);
+      priceInput.disabled = true;
     }
   });
   return playLotto;
@@ -398,18 +402,5 @@ function LottoDashboard() {
   lottoDashboard.appendChild(PlayLotto());
   return lottoDashboard;
 }
-function Main() {
-  const main = createElement("main");
-  main.appendChild(LottoDashboard());
-  return main;
-}
-function Footer() {
-  const footer = createElement("footer");
-  const text = createElement("span", { textContent: "Copyright 2025. woowacourse" });
-  footer.appendChild(text);
-  return footer;
-}
 const app = document.getElementById("app");
-app.appendChild(Header());
-app.appendChild(Main());
-app.appendChild(Footer());
+app.appendChild(LottoDashboard());
