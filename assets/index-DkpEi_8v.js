@@ -59,13 +59,19 @@ function PurchaseForm(playLotto) {
     textContent: "구매 금액을 입력해주세요."
   });
   playLotto.appendChild(purchasePriceHeader);
-  const inputContainer = createElement("div", { class: "input-container" });
-  const priceInput = createElement("input", { type: "text", placeholder: "금액" });
-  const purchaseButton = createElement("button", { textContent: "구매" });
-  inputContainer.appendChild(priceInput);
-  inputContainer.appendChild(purchaseButton);
-  playLotto.appendChild(inputContainer);
-  return { priceInput, purchaseButton };
+  const purchaseForm = createElement("form", { class: "purchase-form" });
+  const priceInput = createElement("input", {
+    type: "number",
+    placeholder: " 금액",
+    required: true,
+    min: "1000",
+    step: "1000"
+  });
+  const purchaseButton = createElement("button", { type: "submit", textContent: "구매" });
+  purchaseForm.appendChild(priceInput);
+  purchaseForm.appendChild(purchaseButton);
+  playLotto.appendChild(purchaseForm);
+  return { priceInput, purchaseForm };
 }
 const LOTTO = Object.freeze({
   MIN_PURCHASE_PRICE: 1e3,
@@ -242,8 +248,9 @@ const plusIfWinningNumbers = (lottoNumbers, randomLotto) => {
   return match;
 };
 const calculateRevenue = (matchCounts, purchasePrice) => {
-  const sumOfLottoPrize = matchCounts.reduce(
-    (acc, cur, idx) => idx >= LOTTO.THREE_MATCH ? acc + cur * calculateRevenueByMatch(idx) : acc,
+  const matchedCountsMoreThanThree = matchCounts.slice(LOTTO.THREE_MATCH);
+  const sumOfLottoPrize = matchedCountsMoreThanThree.reduce(
+    (acc, cur, idx) => acc + cur * calculateRevenueByMatch(idx + LOTTO.THREE_MATCH),
     0
   );
   return Number((sumOfLottoPrize / purchasePrice * 100).toFixed(1));
@@ -382,12 +389,13 @@ function PlayLottoWithPurchasePrice(playLotto, priceInput) {
 }
 function PlayLotto() {
   const playLotto = createElement("div", { class: "play-lotto" });
-  const { priceInput, purchaseButton } = PurchaseForm(playLotto);
-  purchaseButton.addEventListener("click", () => {
+  const { priceInput, purchaseForm } = PurchaseForm(playLotto);
+  purchaseForm.addEventListener("submit", (e) => {
+    e.preventDefault();
     PlayLottoWithPurchasePrice(playLotto, priceInput);
     priceInput.disabled = true;
   });
-  priceInput.addEventListener("keydown", (e) => {
+  priceInput.addEventListener("keyup", (e) => {
     if (e.key === "Enter") {
       PlayLottoWithPurchasePrice(playLotto, priceInput);
       priceInput.disabled = true;
